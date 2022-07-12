@@ -1,4 +1,4 @@
-from dronekit import connect,VehicleMode,mavutil,LocationLocal
+from dronekit import connect,VehicleMode,mavutil,LocationGlobal
 import time
 import numpy as np
 import math
@@ -13,9 +13,9 @@ print("Velocity: %s" % iha.velocity)
 print("Mode: %s" % iha.mode)
 print("Global Location (relative altitude) %s" % iha.location.global_relative_frame)
 
-red_carpet_loc= None
+red_carpet_loc = None
 
-def get_location_meters(original_loc,dNorth,dEast):
+def get_location_meters(original_location,dNorth,dEast):
     earth_r = 6378137.0
     dLat = dNorth / earth_r
     dLon = dEast / (earth_r*math.cos(math.pi*original_location.lat/180))
@@ -35,7 +35,6 @@ def download_mission(vehicle,x,y):
     cmds.wait_ready()
     
 def save_and_plan(vehicle,xdist,ydist):
-    global red_carpet_loc
     roll,yaw,pitch=vehicle.attitude.roll,vehicle.attitude.yaw,vehicle.attitude.pitch
     xreal,yreal=(4*xdist/radius)/math.cos(roll),(4*ydist/radius)/math.cos(pitch)
     try:
@@ -44,7 +43,7 @@ def save_and_plan(vehicle,xdist,ydist):
         xtarget,ytarget=round(math.sqrt(xreal**2+yreal**2)*math.sin(yaw+math.pi/2),2),round(math.sqrt(xreal**2+yreal**2)*math.cos(yaw+math.pi/2),2)
     dist_target=round(math.sqrt(xtarget**2+y**2),2)
     print("Saved coordinates are {} {}".format(x,y))
-    red_carpet_loc = get_location_metres(vehicle.location.global_relative_frame,xtarget,ytarget)
+    red_carpet_loc = get_location_meters(vehicle.location.global_relative_frame,xtarget,ytarget)
     return red_carpet_loc
     
 def switch_mode(vehicle,mode):
@@ -63,9 +62,7 @@ def check_if_near(vehicle,carpet):
     
 def waypoint_creator(vehicle,point,cmds):
     nextpoint=vehicle.commands.next
-    print(" Distance to waypoint (&s): %s" % (nextwaypoint,distance_to_current_waypoint()))
-    
-
+    print(" Distance to waypoint (&s): %s" % (nextpoint,distance_to_current_waypoint()))
     
     
 webcam = cv2.VideoCapture(0)
@@ -94,11 +91,10 @@ while True:
             coordinates = (int(x+w/2), int(y+h/2))
             center_point = (int(imageFrame.shape[1])//2,int(imageFrame.shape[0])//2)
             xdist , ydist = coordinates[0] - center_point[0],coordinates[1] - center_point[1]
-            save_and_plan(vehicle,xdist,ydist)
+            red_carpet_loc=save_and_plan(iha,xdist,ydist)
             '''cv2.circle(imageFrame,(x+w//2,y+h//2),radius,(0,255,255),0)
             cv2.putText(imageFrame,str(xtarget)+" "+str(ytarget)+" "+str(dist_target),((center_point[0]),(center_point[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
             cv2.line(imageFrame,((center_point[0]),(center_point[1])),coordinates,(0,255,0),2)'''
-            save_and_plan(iha,xreal,yreal)
             break_out_flag = True
             break
     if break_out_flag:
