@@ -1,4 +1,4 @@
-from dronekit import connect,VehicleMode,mavutil,LocationGlobal
+from dronekit import connect,VehicleMode,mavutil,LocationGlobal,Command,LocationGlobalRelative
 import time
 import numpy as np
 import math
@@ -22,17 +22,53 @@ def get_location_meters(original_location,dNorth,dEast):
     
     newLat = original_location.lat + (dLat * 180 / math.pi)
     newLon = original_location.lon + (dLon * 180 /math.pi)
-    return LocationGlobal(newLat,newLon,original_location.alt)
+    return LocationGlobalRelative(newLat,newLon,original_location.alt)
 
-def get_distance_metres(aLoc1,aLoc2):
+def get_distance_meters(aLoc1,aLoc2):
     dlat = aLoc2.lat - aLoc1.lat
     dlon = aLoc2.lon - aLoc1.lon
     return math.sqrt((dlat**2)+(dlon**2))*1.113195e5
 
-def download_mission(vehicle,x,y):
+
+def mission_updater(vehicle,carpet):
+    # generate waypoints for the carpet
+    waypoints = []
+    for i in range(-20,1):
+        if i%2==0:
+            waypoints.append(get_location_meters(carpet,i,0))
+    #create commands list with waypoints
+    commands = []
+    for wp in waypoints:
+        commands.append(Command(0,0,0,mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,0,0,0,0,0,0,wp.lat,wp.lon,wp.alt))
+    #download the commands
     cmds = vehicle.commands
     cmds.download()
     cmds.wait_ready()
+    #get the number of commands
+    cmds_count = cmds.count
+    missionlist=[]
+    for cmd in cmds:
+        missionlist.append(cmd)
+    nextwaypoint=vehicle.commands.next
+    if nextwaypoint==0:
+        return None
+    #insert the command
+    for i in range(nextwaypoint,cmds_count):
+        lat,lon,alt=missionlist[i].x,missionlist[i].y,missionlist[i].z
+        waypointlocation=LocationGlobalRelative(lat,lon,alt)
+        lat_cur,lon_cur,alt_cur=missionlist[nextwaypoint-1].x,missionlist[nextwaypoint-1].y,missionlist[nextwaypoint-1].z
+        waypointcurrent=LocationGlobalRelative(lat_cur,lon_cur,alt_cur)
+        waypointtocurrent=get_distance_meters(waypointlocation,waypointcurrent)
+        carpettocurrent=get_distance_meters(waypointcurrent,carpet)
+        if waypointtocurrent-carpettocurrent<10.0:
+            missionlist.pop(i)       
+    for new_command in range(len(commands)):
+        missionlist.insert(nextwaypoint-1+new_command,commands[new_command])
+    #upload the new list
+    cmds.clear()
+    for cmd in missionlist:
+        cmds.add(cmd)
+    cmds.upload()
     
 def save_and_plan(vehicle,xdist,ydist):
     roll,yaw,pitch=vehicle.attitude.roll,vehicle.attitude.yaw,vehicle.attitude.pitch
@@ -55,14 +91,10 @@ def switch_mode(vehicle,mode):
     print("New mode: %s" % iha.mode)
 
 def check_if_near(vehicle,carpet):
-    if (vehicle.location.global_relative_frame.east - carpet.east)*1.113195e5 < 2 and (vehicle.location_global_relative_frame.north - carpet.north)*1.113195e5 < 20 :
+    if (vehicle.location.global_relative_frame.east - carpet.east)*1.113195e5 < 15 and (vehicle.location_global_relative_frame.north - carpet.north)*1.113195e5 < 30 :
         return True
     else:
         return False
-    
-def waypoint_creator(vehicle,point,cmds):
-    nextpoint=vehicle.commands.next
-    print(" Distance to waypoint (&s): %s" % (nextpoint,distance_to_current_waypoint()))
     
     
 webcam = cv2.VideoCapture(0)
@@ -105,6 +137,3 @@ while True:
         cap.release()
         cv2.destroyAllWindows()
         break'''
-
-switch_to_guided(iha)
-
