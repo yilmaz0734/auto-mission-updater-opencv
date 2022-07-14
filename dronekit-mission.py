@@ -5,6 +5,8 @@ import math
 import cv2
 import sys
 
+ball_area=0.1
+ball_mass=0.15
 old_stdout = sys.stdout
 log_file = open("log.txt","w")
 sys.stdout = log_file
@@ -120,7 +122,12 @@ def projectile_handler(vehicle,carpet,ball_area,ball_mass):
     print("Calculating the latitude difference...")
     x = vx*t + gwx*(t**2)*0.5
     y = vy*t + gwy*(t**2)*0.5
-    return math.sqrt(x**2+y**2)
+    distance = math.sqrt(x**2+y**2)
+    if distance>=get_distance_meters(carpet,vehicle_location):
+        print("The projection conditions has been met, the ball is in the carpet!")
+        return True
+    else:
+        return False
 
 def save_and_plan(vehicle,xdist,ydist):
     print("Saving process has been started...")
@@ -198,6 +205,7 @@ if iha.mode!="AUTO":
     switch_mode(iha,"AUTO")
 else:
     print("Vehicle mode is AUTO, mission is being started...")
+
 time.sleep(10)
 while True:
     print("After ten seconds, red carpet checking is started.")
@@ -205,19 +213,30 @@ while True:
         print("Circle has been completed, there are 30 meters to the red carpet.")
         mission_updater(iha,red_carpet_loc)
         break
+while True:
+    if projectile_handler(iha,red_carpet_loc,ball_area,ball_mass):
+        set_servo(iha,13,2000)
+        break
 
+    
 print("Second part of the mission is in progress...")
 if iha.mode!="AUTO":
     print("Vehicle mode is not AUTO, switching to AUTO mode...")
     switch_mode(iha,"AUTO")
 else:
     print("Vehicle mode is AUTO, mission is being started...")
+
 time.sleep(10)
 while True:
     print("After ten seconds, red carpet checking is started.")
     if check_if_near(iha,red_carpet_loc):
         print("Circle has been completed, there are 30 meters to the red carpet.")
         mission_updater(iha,red_carpet_loc)
+        break
+while True:
+    if projectile_handler(iha,red_carpet_loc,ball_area,ball_mass):
+        set_servo(iha,14,2000)
+        break
 
 
 sys.stdout = old_stdout
