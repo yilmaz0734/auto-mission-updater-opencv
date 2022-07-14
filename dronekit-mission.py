@@ -122,9 +122,6 @@ def projectile_handler(vehicle,carpet,ball_area,ball_mass):
     y = vy*t + gwy*(t**2)*0.5
     return math.sqrt(x**2+y**2)
 
-
-
-
 def save_and_plan(vehicle,xdist,ydist):
     print("Saving process has been started...")
     roll,yaw,pitch=vehicle.attitude.roll,vehicle.attitude.yaw,vehicle.attitude.pitch
