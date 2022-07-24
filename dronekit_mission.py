@@ -1,5 +1,6 @@
 from dronekit import connect,VehicleMode,mavutil,LocationGlobal,Command,LocationGlobalRelative
 import time
+from matplotlib.pyplot import get
 import numpy as np
 import math
 import cv2
@@ -24,6 +25,22 @@ print("Global Location (relative altitude) %s" % iha.location.global_relative_fr
 
 red_carpet_loc = None
 
+time.sleep(5)
+
+def get_the_angle(vehicle):
+    print("Calculating the angle between global north and y axis of the road")
+    #get the yaw angle after 10 seconds
+    time.sleep(0.5)
+    yaw_angle = vehicle.attitude.yaw
+    print("Road angle: %s" % yaw_angle)
+    return yaw_angle
+
+liste = []
+for i in range(10):
+    liste.append(get_the_angle(iha))
+road_angle = sum(liste)/len(liste)
+print("Road angle: %s" % road_angle)
+
 def set_servo(vehicle, servo_number, pwm_value):
 	pwm_value_int = int(pwm_value)
 	msg = vehicle.message_factory.command_long_encode(
@@ -45,6 +62,17 @@ def get_location_meters(original_location,dNorth,dEast):
     newLon = original_location.lon + (dLon * 180 /math.pi)
     return LocationGlobalRelative(newLat,newLon,original_location.alt)
 
+def get_location_meters_for_road(original_location,dx,dy):
+    earth_r = 6378137.0
+    dNorth = math.sin(math.atan(dy/dx)-road_angle)*math.sqrt(dx**2+dy**2)
+    dEast = math.cos(math.atan(dy/dx)-road_angle)*math.sqrt(dx**2+dy**2)
+    dLat = dNorth / earth_r
+    dLon = dEast / (earth_r*math.cos(math.pi*original_location.lat/180))
+    
+    newLat = original_location.lat + (dLat * 180 / math.pi)
+    newLon = original_location.lon + (dLon * 180 /math.pi)
+    return LocationGlobalRelative(newLat,newLon,original_location.alt)
+
 def get_distance_meters(aLoc1,aLoc2):
     dlat = aLoc2.lat - aLoc1.lat
     dlon = aLoc2.lon - aLoc1.lon
@@ -54,9 +82,8 @@ def mission_updater(vehicle,carpet):
     # generate waypoints for the carpet
     print("Generating waypoints for the carpet...")
     waypoints = []
-    for i in range(-20,1):
-        if i%2==0:
-            waypoints.append(get_location_meters(carpet,i,0))
+    for i in [-10,5]:
+        waypoints.append(get_location_meters_for_road(carpet,0,i))
     #create commands list with waypoints
     commands = []
     for wp in waypoints:
@@ -104,9 +131,10 @@ def projectile_handler(vehicle,carpet,ball_area,ball_mass):
     # get the ground and air velocities
     print("Getting the ground and air velocities...")
     ground_velocity = vehicle.velocity
-    vx,vy,vz = ground_velocity.x,ground_velocity.y,ground_velocity.z
+    veast,vnorth,vz = ground_velocity.x,ground_velocity.y,ground_velocity.z
     air_velocity = vehicle.airspeed
-    wx,wy,wz = ground_velocity.x-air_velocity.x,ground_velocity.y-air_velocity.y,ground_velocity.z-air_velocity.z
+    weast,wnorth,wz = air_velocity.x,air_velocity.y,air_velocity.z
+    
     # get the coordinates of the vehicle
     print("Getting the coordinates of the vehicle...")
     vehicle_location = vehicle.location.global_relative_frame
@@ -160,7 +188,6 @@ webcam = cv2.VideoCapture(0)
 print("Webcam initialized, search for red carpet is started.")
 while True:
     _, imageFrame = webcam.read()
-
     hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
     red_lower,red_upper = np.array([136, 87, 111], np.uint8) , np.array([180, 255, 255], np.uint8)
     red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
