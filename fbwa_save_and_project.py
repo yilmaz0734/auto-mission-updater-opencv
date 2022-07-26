@@ -94,6 +94,7 @@ act_alt = sum(alts)/len(alts)
 print("Actual location: %s" % (act_lat,act_lon,act_alt))
 red_zone_location = LocationGlobalRelative(act_lat,act_lon,act_alt)
 
+time.sleep(10)
 start_sec = time.time()
 telemetry_count_sec = 1
 while True:
