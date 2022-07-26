@@ -116,23 +116,20 @@ while True:
         break
 start_sec = time.time()
 telemetry_count_sec = 1
+run_once = 0
 while True:
+    pwm = 1000
     end_sec = time.time()
-    if round(end_sec-start_sec,6)%0.5==0:
-        if get_distance_meters(iha.location.global_relative_frame,red_zone_location)<=6:
-            pwm = 2000
-        else:
-            pwm = 1000
-    if round(end - start,6)%1 == 0:
-        telemetry_sender(iha,telemetry_count_sec)
-        telemetry_count_sec+=1
+    if get_distance_meters(iha.location.global_relative_frame,red_zone_location)<=6:
+        pwm = 2000
     if pwm == 2000:
-        set_servo(iha,12,pwm)
-        time.sleep(2)
-        break
-    else:
-        if round(end_sec-start_sec,6)%2==0:
-            set_servo(iha,12,pwm)
+        set_servo(iha,11,pwm)
+        run_once = 0
+    elif pwm ==1000 and run_once==0:
+        set_servo(iha,11,pwm)
+        telemetry_sender(iha,telemetry_count)
+        telemetry_count+=1
+        run_once = 1
 
         
 '''print("Second part of the mission is in progress...")

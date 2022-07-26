@@ -132,7 +132,7 @@ def projectile_handler(vehicle,carpet,ball_area,ball_mass,road_angle):
 
 def save_and_plan(pitch,roll,yaw,location,xdist,ydist,radius):
     print("Saving process has been started...")
-    xreal,yreal=(4*xdist/radius)/math.cos(roll),(4*ydist/radius)/math.cos(pitch)
+    xreal,yreal=(0.8*xdist/radius),(0.8*ydist/radius)
     try:
         xtarget,ytarget=round(math.sqrt(xreal**2+yreal**2)*math.cos(-yaw+math.atan(yreal/xreal)),2),round(math.sqrt(xreal**2+yreal**2)*math.sin(-yaw+math.atan(yreal/xreal)),2)
     except:
@@ -145,7 +145,6 @@ def save_and_plan(pitch,roll,yaw,location,xdist,ydist,radius):
 def telemetry_sender(vehicle,telemetry_count):
     print("-----------------------------------------------------")
     print("Telemetry number: %s" % telemetry_count)
-    print("Mode: %s" % vehicle.mode)
     print("Attitude: %s" % vehicle.attitude)
     print("Velocity: %s" % vehicle.velocity)
     print("Global Location (relative altitude) %s" % vehicle.location.global_relative_frame)
