@@ -1,8 +1,10 @@
 import cv2
 import numpy as np
 import math
-webcam = cv2.VideoCapture(1)
+import time
+webcam = cv2.VideoCapture(0)
 print("Webcam initialized, search for red carpet is started.")
+start=time.time()
 while True:
     _, imageFrame = webcam.read()
     hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
@@ -28,19 +30,38 @@ while True:
             coordinates = (int(x+w/2), int(y+h/2))
             center_point = (int(imageFrame.shape[1])//2,int(imageFrame.shape[0])//2)
             xdist , ydist = coordinates[0] - center_point[0],coordinates[1] - center_point[1]
+            pixel_distance = round(math.sqrt(xdist**2 + ydist**2),2)
             print("Saving process has been started...")
-            roll,yaw,pitch=0,0,0
-            xreal,yreal=(4*xdist/radius)/math.cos(roll),(4*ydist/radius)/math.cos(pitch)
-            try:
-                xtarget,ytarget=round(math.sqrt(xreal**2+yreal**2)*math.sin(yaw+math.atan(xreal/yreal)),2),round(math.sqrt(xreal**2+yreal**2)*math.cos(yaw+math.atan(xreal/yreal)),2)
-            except:
-                xtarget,ytarget=round(math.sqrt(xreal**2+yreal**2)*math.sin(yaw+math.pi/2),2),round(math.sqrt(xreal**2+yreal**2)*math.cos(yaw+math.pi/2),2)
-            dist_target=round(math.sqrt(xtarget**2+ytarget**2),2)
+            roll,yaw,pitch=0,math.pi/4,0
+            xreal,yreal=(4*xdist/radius),(4*ydist/radius)
+            real_distance = round(math.sqrt(xreal**2 + yreal**2),2)
+            east_d = math.cos(yaw)*xreal - math.sin(yaw)*yreal
+            north_d = math.sin(yaw)*xreal + math.cos(yaw)*yreal
+            dist_target=round(math.sqrt(east_d**2+north_d**2),2)
+            red_carpet_loc=None
+            info = """
+x_d = {} y_d = {} p_d = {} \n
+x_r = {} y_r = {} r_d = {} \n
+pitch = {} yaw = {} roll = {} \n
+east_t = {} north_t = {} t_d = {} \n
+time = {} \n
+p_l = {} \n
+c_l = {} \n
+            """.format(round(xdist,2),round(ydist,2),pixel_distance,
+            round(xreal,2),round(yreal,2),real_distance,pitch,yaw,roll,
+            round(east_d,2),round(north_d,2),dist_target,
+            round(time.time()-start,3),
+            [0,0,0],
+            [0,0,0])
             cv2.circle(imageFrame,(x+w//2,y+h//2),radius,(0,255,255),3)
-            cv2.putText(imageFrame,str(xtarget)+" "+str(ytarget)+" "+str(dist_target),((center_point[0]),(center_point[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            #cv2.putText(imageFrame,str(xtarget)+" "+str(ytarget)+" "+str(dist_target),((center_point[0]),(center_point[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
             cv2.line(imageFrame,((center_point[0]),(center_point[1])),coordinates,(0,255,0),2)
+            y0, dy = 7, 15
+            for i, line in enumerate(info.split('\n')):
+                y = y0 + i*dy
+                cv2.putText(imageFrame, line, (0,y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
     # Program Termination
-    cv2.imshow("Multiple Color Detection in Real-TIme", red_mask)
+    cv2.imshow("Multiple Color Detection in Real-TIme", imageFrame)
     if cv2.waitKey(10) & 0xFF == ord('q'):
         cap.release()
         cv2.destroyAllWindows()

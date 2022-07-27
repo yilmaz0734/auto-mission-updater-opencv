@@ -30,12 +30,8 @@ def get_location_meters(original_location,dNorth,dEast):
 
 def get_location_meters_for_road(original_location,dx,dy,road_angle):
     earth_r = 6378137.0
-    try:
-        dNorth = math.sin(math.atan(dy/dx)-road_angle)*math.sqrt(dx**2+dy**2)
-        dEast = math.cos(math.atan(dy/dx)-road_angle)*math.sqrt(dx**2+dy**2)
-    except:
-        dNorth = math.sin(math.pi/2-road_angle)*math.sqrt(dx**2+dy**2)
-        dEast = math.cos(math.pi/2-road_angle)*math.sqrt(dx**2+dy**2)
+    dEast = math.cos(road_angle)*dx - math.sin(road_angle)*dy
+    dNorth = math.sin(road_angle)*dx + math.cos(road_angle)*dy
     dLat = dNorth / earth_r
     dLon = dEast / (earth_r*math.cos(math.pi*original_location.lat/180))
     newLat = original_location.lat + (dLat * 180 / math.pi)

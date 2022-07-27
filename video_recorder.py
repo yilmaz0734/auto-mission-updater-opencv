@@ -21,18 +21,8 @@ print("Attitude: %s" % iha.attitude)
 print("Velocity: %s" % iha.velocity)
 print("Global Location (relative altitude) %s" % iha.location.global_relative_frame)
 print("..........................\n")
-    
-'''road_angle_list = []
-
-for i in range(10):
-    road_angle_list.append(iha.attitude.yaw)
-    time.sleep(0.5)
-
-road_angle = sum(road_angle_list)/len(road_angle_list)
-print("Road angle: %s" % road_angle)'''
-
 video = cv2.VideoCapture(0)
-
+time.sleep(60)
 if (video.isOpened() == False):
     print("Error reading video file")
 video.set(3,1920)
@@ -52,14 +42,13 @@ while(True):
     red_mask = cv2.dilate(red_mask, kernal)
     res_red = cv2.bitwise_and(imageFrame, imageFrame, 
                               mask = red_mask)
-    rgb = cv2.cvtColor(red_mask,cv2.COLOR_GRAY2BGR)
     contours, hierarchy = cv2.findContours(red_mask,
                                            cv2.RETR_TREE,
                                            cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
     count+=1
-    end = time.time()
-    if (end-start)>120:
+ 
+    if (time.time()-start)>240:
         break
     for pic, contour in enumerate(contours[:1]):
         area = cv2.contourArea(contour)
@@ -73,23 +62,37 @@ while(True):
             coordinates = (int(x+w/2), int(y+h/2))
             center_point = (int(imageFrame.shape[1])//2,int(imageFrame.shape[0])//2)
             xdist , ydist = coordinates[0] - center_point[0],coordinates[1] - center_point[1]
-            xreal,yreal=(0.8*xdist/radius),(0.8*ydist/radius)
-            dist_target = math.sqrt(xreal**2 + yreal**2)
+            pixel_distance = math.sqrt(xdist**2 + ydist**2)
+            xreal,yreal=(1.25*xdist/radius),(1.25*ydist/radius)
+            real_distance = math.sqrt(xreal**2 + yreal**2)
+            east_d = math.cos(yaw)*xreal - math.sin(yaw)*yreal
+            north_d = math.sin(yaw)*xreal + math.cos(yaw)*yreal
+            dist_target = math.sqrt(east_d**2+north_d**2)
+            red_carpet_loc = get_location_meters(coordinates,north_d,east_d)
+            info = """
+x_d = {} y_d = {} p_d = {} \n
+x_r = {} y_r = {} r_d = {} \n
+pitch = {} yaw = {} roll = {} \n
+east_t = {} north_t = {} t_d = {} \n
+time = {} \n
+p_l = {} \n
+c_l = {} \n
+            """.format(round(xdist,2),round(ydist,2),round(pixel_distance,2),
+            round(xreal,2),round(yreal,2),round(real_distance,2),round(pitch,2),round(yaw,2),round(roll,2),
+            round(east_d,2),round(north_d,2),round(dist_target,2),
+            round(time.time()-start,2),
+            [location.lat,location.lon,location.alt],
+            [red_carpet_loc.lat,red_carpet_loc.lon,red_carpet_loc.alt])
             cv2.circle(imageFrame,(x+w//2,y+h//2),radius,(0,255,255),3)
-            cv2.putText(imageFrame,str(xreal)+" "+str(yreal)+" "+str(dist_target),((center_point[0]),(center_point[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            #cv2.putText(imageFrame,str(xtarget)+" "+str(ytarget)+" "+str(dist_target),((center_point[0]),(center_point[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
             cv2.line(imageFrame,((center_point[0]),(center_point[1])),coordinates,(0,255,0),2)
-            red_carpet_loc=save_and_plan(pitch,roll,yaw,location,xdist,ydist,radius)
-            print("Red carpet location: %s" % red_carpet_loc)
+            y0, dy = 7, 15
+            for i, line in enumerate(info.split('\n')):
+                y = y0 + i*dy
+                cv2.putText(imageFrame, line, (0,y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
+            print("Red zone found! \n"+info + "\n -----------------------------------------------------")
             saved_coordinates.append(red_carpet_loc)
-            send_or_not = 1
-    cv2.imwrite("/home/pi/Desktop/auto-mission-updater-opencv/frames_mask/frame{}.jpg".format(count),rgb)
-    cv2.imwrite("/home/pi/Desktop/auto-mission-updater-opencv/frames/frame{}.jpg".format(count),imageFrame)
-    if send_or_not == 1:
-        telemetry_count+=1
-        if telemetry_count%5<2 and telemetry_count%5>0:
-            telemetry_sender(iha,telemetry_count)
-        send_or_not=0
-        
+    cv2.imwrite("/home/pi/Desktop/auto-mission-updater-opencv/framesrecord/frame{}.jpg".format(count),imageFrame)
     
 
 endlast = time.time()
@@ -102,7 +105,7 @@ print("Home location: %s" % iha.home_location)
 if len(saved_coordinates)==0:
     print("No red carpet found!")
 else:
-    print("Red carpet found!")
+    print("Red carpet found {} times!".format(len(saved_coordinates)))
     print("Coordinates: ")
     for i in saved_coordinates:
         print("lat: {}, lon: {}, alt: {}".format(i.lat,i.lon,i.alt))
