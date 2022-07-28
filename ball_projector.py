@@ -5,7 +5,7 @@ import math
 import cv2
 import sys
 from plane_functions import *
-
+time.sleep(90)
 old_stdout = sys.stdout
 log_file = open("/home/pi/Desktop/auto-mission-updater-opencv/log.txt","w")
 sys.stdout = log_file
@@ -19,20 +19,27 @@ print("Connected to İHA!")
 print("Mode: %s" % iha.mode)
 print("Attitude: %s" % iha.attitude)
 print("Velocity: %s" % iha.velocity)
-#print("Global Location (relative altitude) %s" % iha.location.global_relative_frame)
+print("Global Location (relative altitude) %s" % iha.location.global_relative_frame)
 print("..........................\n")
 
-'''road_angle_list = []
+attitude = iha.attitude
+velocity = iha.velocity
+global_location = iha.location.global_relative_frame
 
-for i in range(10):
-    road_angle_list.append(iha.attitude.yaw)
-    time.sleep(0.5)
-
-road_angle = sum(road_angle_list)/len(road_angle_list)
-print("Road angle: %s" % road_angle)'''
+@iha.on_attribute('attitude')
+def attitude_listener(self, name, msg):
+    global attitude
+    attitude = msg
+@iha.on_attribute('location.global_relative_frame')
+def location_listener(self, name, msg):
+    global global_location
+    global_location = msg
+@iha.on_attribute('velocity')
+def velocity_listener(self, name, msg):
+    global velocity
+    velocity = msg
 
 video = cv2.VideoCapture(0)
-time.sleep(60)
 if (video.isOpened() == False):
     print("Error reading video file")
 video.set(3,1920)
@@ -45,7 +52,6 @@ telemetry_count = 1
 saved_coordinates = []
 run_once = 0
 while(True):
-    
     _, imageFrame = video.read()
     end = time.time()
     hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
@@ -61,15 +67,13 @@ while(True):
                                            cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
     count+=1
-    if (end-start)>240:
+    if (end-start)>300:
         break
     length = len(saved_coordinates)
-    pwm = 1000
+    pwm = 2000
     for pic, contour in enumerate(contours[:1]):
         area = cv2.contourArea(contour)
-        if(area > 1000):
-            pitch,roll,yaw = iha.attitude.pitch,iha.attitude.roll,iha.attitude.yaw
-            location = iha.location.global_relative_frame
+        if(area > 20000):
             x, y, w, h = cv2.boundingRect(contour)
             cx = x + w/2
             cy = y + h/2
@@ -80,13 +84,12 @@ while(True):
             pixel_distance = math.sqrt(xdist**2 + ydist**2)
             xreal,yreal=(1.25*xdist/radius),(1.25*ydist/radius)
             real_distance = math.sqrt(xreal**2 + yreal**2)
-            east_d = math.cos(yaw)*xreal - math.sin(yaw)*yreal
-            north_d = math.sin(yaw)*xreal + math.cos(yaw)*yreal
+            east_d = math.cos(-attitude.yaw)*xreal - math.sin(-attitude.yaw)*yreal
+            north_d = math.sin(-attitude.yaw)*xreal + math.cos(-attitude.yaw)*yreal
             dist_target = math.sqrt(east_d**2+north_d**2)
-            red_carpet_loc = get_location_meters(coordinates,north_d,east_d)
-            print("Red zone found! \n"+info + "\n -----------------------------------------------------")
+            red_carpet_loc = get_location_meters(global_location,north_d,east_d)
             saved_coordinates.append(red_carpet_loc)
-            pwm = 2000
+            pwm = 1000
             print("Servo function triggered!")
             info = """
 x_d = {} y_d = {} p_d = {} \n
@@ -96,31 +99,39 @@ east_t = {} north_t = {} t_d = {} \n
 time = {} \n
 p_l = {} \n
 c_l = {} \n
+pixel_num = {}
             """.format(round(xdist,2),round(ydist,2),round(pixel_distance,2),
-            round(xreal,2),round(yreal,2),round(real_distance,2),round(pitch,2),round(yaw,2),round(roll,2),
+            round(xreal,2),round(yreal,2),round(real_distance,2),round(attitude.pitch,2),round(attitude.yaw,2),round(attitude.roll,2),
             round(east_d,2),round(north_d,2),round(dist_target,2),
             round(time.time()-start,2),
-            [location.lat,location.lon,location.alt],
-            [red_carpet_loc.lat,red_carpet_loc.lon,red_carpet_loc.alt])
-            cv2.circle(imageFrame,(x+w//2,y+h//2),radius,(0,255,255),3)
-            #cv2.putText(imageFrame,str(xtarget)+" "+str(ytarget)+" "+str(dist_target),((center_point[0]),(center_point[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            [global_location.lat,global_location.lon,global_location.alt],
+            [red_carpet_loc.lat,red_carpet_loc.lon,red_carpet_loc.alt],
+            area)
+            y0, dy = 7, 15
+            for i, line in enumerate(info.split('\n')):
+                y = y0 + i*dy
+                cv2.putText(imageFrame, line, (0,y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
+            print("Red zone found! \n"+info + "\n -----------------------------------------------------")
+            cv2.circle(imageFrame,(x+w//2,y+h//2),int(radius),(0,255,255),3)
+            cv2.putText(imageFrame,str(east_d)+" "+str(north_d)+" "+str(dist_target),((center_point[0]),(center_point[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
             cv2.line(imageFrame,((center_point[0]),(center_point[1])),coordinates,(0,255,0),2)
-            cv2.imwrite("/home/pi/Desktop/auto-mission-updater-opencv/framesproject/frame{}.jpg".format(count),imageFrame)
-    if pwm == 2000:
+    cv2.imwrite("/home/pi/Desktop/auto-mission-updater-opencv/frames_project/frame{}.jpg".format(count),imageFrame)
+    if pwm == 1000:
         set_servo(iha,11,pwm)
         run_once = 0
-    elif pwm ==1000 and run_once==0:
+    elif pwm ==2000 and run_once==0:
+        run_once = 1
         set_servo(iha,11,pwm)
         telemetry_sender(iha,telemetry_count)
         telemetry_count+=1
-        run_once = 1
+        
         
 endlast = time.time()
 print("Video recording has been finished!")
 print("Flight notes: ")
 print("********************************************************")
 print("Flight time: %s" % (endlast-start))
-print("Total distance taken: %s" % get_distance_meters(iha.home_location, iha.location.global_relative_frame))
+print("Total distance taken: %s" % get_distance_meters(iha.home_location, global_location))
 print("Home location: %s" % iha.home_location)
 if len(saved_coordinates)==0:
     print("No red carpet found!")

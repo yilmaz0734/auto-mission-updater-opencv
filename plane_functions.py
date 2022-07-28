@@ -30,8 +30,8 @@ def get_location_meters(original_location,dNorth,dEast):
 
 def get_location_meters_for_road(original_location,dx,dy,road_angle):
     earth_r = 6378137.0
-    dEast = math.cos(road_angle)*dx - math.sin(road_angle)*dy
-    dNorth = math.sin(road_angle)*dx + math.cos(road_angle)*dy
+    dEast = math.cos(-road_angle)*dx - math.sin(-road_angle)*dy
+    dNorth = math.sin(-road_angle)*dx + math.cos(-road_angle)*dy
     dLat = dNorth / earth_r
     dLon = dEast / (earth_r*math.cos(math.pi*original_location.lat/180))
     newLat = original_location.lat + (dLat * 180 / math.pi)
@@ -43,12 +43,12 @@ def get_distance_meters(aLoc1,aLoc2):
     dlon = aLoc2.lon - aLoc1.lon
     return math.sqrt((dlat**2)+(dlon**2))*1.113195e5
 
-def mission_updater(vehicle,carpet):
+def mission_updater(vehicle,carpet,current_yaw):
     # generate waypoints for the carpet
     print("Generating waypoints for the carpet...")
     waypoints = []
-    for i in [10,0,-10]:
-        waypoints.append(get_location_meters_for_road(carpet,0,i))
+    for i in [-10,0,10]:
+        waypoints.append(get_location_meters_for_road(carpet,current_yaw,0,i))
     #create commands list with waypoints
     commands = []
     for wp in waypoints:
@@ -75,7 +75,7 @@ def mission_updater(vehicle,carpet):
         waypointcurrent=LocationGlobalRelative(lat_cur,lon_cur,alt_cur)
         waypointtocurrent=get_distance_meters(waypointlocation,waypointcurrent)
         carpettocurrent=get_distance_meters(waypointcurrent,carpet)
-        if waypointtocurrent-carpettocurrent<30.0:
+        if waypointtocurrent-carpettocurrent<10.0:
             print("The waypoint with coordinates {},{},{} is being deleted...".format(lat,lon,alt))
             missionlist.pop(i)       
     print("The noisy waypoints are deleted!")
@@ -126,18 +126,6 @@ def projectile_handler(vehicle,carpet,ball_area,ball_mass,road_angle):
     else:
         return False
 
-def save_and_plan(pitch,roll,yaw,location,xdist,ydist,radius):
-    print("Saving process has been started...")
-    xreal,yreal=(0.8*xdist/radius),(0.8*ydist/radius)
-    try:
-        xtarget,ytarget=round(math.sqrt(xreal**2+yreal**2)*math.cos(-yaw+math.atan(yreal/xreal)),2),round(math.sqrt(xreal**2+yreal**2)*math.sin(-yaw+math.atan(yreal/xreal)),2)
-    except:
-        xtarget,ytarget=round(math.sqrt(xreal**2+yreal**2)*math.cos(-yaw+math.pi/2),2),round(math.sqrt(xreal**2+yreal**2)*math.sin(-yaw+math.pi/2),2)
-    dist_target=round(math.sqrt(xtarget**2+ytarget**2),2)
-    print("Saving process has been finished!, distance to target is {} m".format(dist_target))
-    red_carpet_loc = get_location_meters(location,xtarget,ytarget)
-    return red_carpet_loc
-
 def telemetry_sender(vehicle,telemetry_count):
     print("-----------------------------------------------------")
     print("Telemetry number: %s" % telemetry_count)
@@ -158,8 +146,8 @@ def switch_mode(vehicle,mode):
 def check_if_near(vehicle,carpet,road_angle):
     eas_dist_meters = (vehicle.location.global_relative_frame.east - carpet.east)*1.113195e5
     north_dist_meters = (vehicle.location_global_relative_frame.north - carpet.north)*1.113195e5
-    xdist = north_dist_meters*math.sin(road_angle)+eas_dist_meters*math.cos(road_angle)
-    ydist = north_dist_meters*math.cos(road_angle)-eas_dist_meters*math.sin(road_angle)
+    xdist = math.cos(road_angle)*eas_dist_meters - math.sin(road_angle)*north_dist_meters
+    ydist = math.sin(road_angle)*eas_dist_meters + math.cos(road_angle)*north_dist_meters
     if math.abs(xdist)<3 and math.abs(ydist)<20:
         return True
     else:
