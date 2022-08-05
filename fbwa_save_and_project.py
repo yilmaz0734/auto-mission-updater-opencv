@@ -45,7 +45,7 @@ video.set(4,1080)
 
 start = time.time()
 count = 1
-run_once,repeater = 0,0,0
+run_once,repeater = 0,0
 weight_list,saved_coordinates = [],[]
 print("Sleep started!")
 print(velocity)

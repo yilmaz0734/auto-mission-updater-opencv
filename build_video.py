@@ -10,7 +10,7 @@ def take_number(path):
 fnames=[]
 for filename in glob.glob('frames/*.jpg'):
     fnames.append(filename)
-out = cv2.VideoWriter('output_video.avi',cv2.VideoWriter_fourcc(*'MJPG'), len(fnames)/100, (1920,1080))
+out = cv2.VideoWriter('output_video.avi',cv2.VideoWriter_fourcc(*'MJPG'), len(fnames)/70, (1920,1080))
 # sort fnames according to filenames
 fnames.sort(key = take_number)
 print(fnames)

@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import math
 import time
-webcam = cv2.VideoCapture(0)
+webcam = cv2.VideoCapture(1)
 print("Webcam initialized, search for red carpet is started.")
 start=time.time()
 weight_list = []
@@ -62,28 +62,9 @@ variabler = {}
             [0,0,0],
             variabler)
             #cv2.drawContours(imageFrame, hull_list,0, (0,0,0), 1, 8)
-            #cv2.circle(imageFrame,(x+w//2,y+h//2),radius,(0,255,0),3)
+            cv2.circle(imageFrame,(x+w//2,y+h//2),radius,(0,255,0),3)
             ellipse = cv2.fitEllipse(contour)
             cv2.ellipse(imageFrame,ellipse,(0,255,255),2)
-            (xc,yc),(d1,d2),angle = ellipse
-            print(xc,yc,d1,d1,angle)
-            # draw circle at center
-            xc, yc = ellipse[0]
-            cv2.circle(imageFrame, (int(xc),int(yc)), 10, (255, 255, 255), -1)
-
-            # draw vertical line
-            # compute major radius
-            rmajor = max(d1,d2)/2
-            if angle > 90:
-                angle = angle - 90
-            else:
-                angle = angle + 90
-            print(angle)
-            xtop = xc + math.cos(math.radians(angle))*rmajor
-            ytop = yc + math.sin(math.radians(angle))*rmajor
-            xbot = xc + math.cos(math.radians(angle+180))*rmajor
-            ybot = yc + math.sin(math.radians(angle+180))*rmajor
-            cv2.line(imageFrame, (int(xtop),int(ytop)), (int(xbot),int(ybot)), (0, 0, 255), 3)
             #cv2.putText(imageFrame,str(xtarget)+" "+str(ytarget)+" "+str(dist_target),((center_point[0]),(center_point[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
             cv2.line(imageFrame,((center_point[0]),(center_point[1])),coordinates,(0,255,0),2)
             y0, dy = 7, 15

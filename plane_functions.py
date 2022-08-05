@@ -128,11 +128,11 @@ def mission_updater_new(vehicle,carpet):
     missionlist=[]
     for cmd in cmds:
         missionlist.append(cmd)
-    lat_cur,lon_cur,alt_cur=missionlist[3].x,missionlist[3].y,missionlist[3].z 
+    lat_cur,lon_cur,alt_cur=missionlist[3].x,missionlist[3].y,10
     waypointcurrent=LocationGlobalRelative(lat_cur,lon_cur,alt_cur)
     angle = get_bearing(waypointcurrent,carpet)
     waypoints = []
-    for i in [0,10]:
+    for i in [0,15]:
         waypoints.append(get_location_meters_for_road(carpet,0,i,angle))
     commands = []
     for wp in waypoints:
