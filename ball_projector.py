@@ -5,7 +5,6 @@ import math
 import cv2
 import sys
 from plane_functions import *
-time.sleep(90)
 old_stdout = sys.stdout
 log_file = open("/home/pi/Desktop/auto-mission-updater-opencv/log.txt","w")
 sys.stdout = log_file
@@ -23,21 +22,34 @@ print("Global Location (relative altitude) %s" % iha.location.global_relative_fr
 print("..........................\n")
 
 attitude = iha.attitude
-velocity = iha.velocity
-global_location = iha.location.global_relative_frame
-
 @iha.on_attribute('attitude')
 def attitude_listener(self, name, msg):
     global attitude
-    attitude = msg
+    if attitude.pitch == round(self.attitude.pitch,2) or attitude.roll == round(self.attitude.roll,2):
+        return
+    attitude = self.attitude
+
+global_location = iha.location.global_relative_frame
 @iha.on_attribute('location.global_relative_frame')
 def location_listener(self, name, msg):
     global global_location
-    global_location = msg
+    global_location = self.location.global_relative_frame
+
+velocity = iha.velocity   
 @iha.on_attribute('velocity')
 def velocity_listener(self, name, msg):
     global velocity
-    velocity = msg
+    if velocity[1] == round(self.velocity[1],1) or velocity[0] == round(self.velocity[0],1):
+        return
+    velocity = self.velocity
+
+last_rangefinder_distance=0
+@iha.on_attribute('rangefinder')
+def rangefinder_callback(self,attr_name):
+    global last_rangefinder_distance
+    if last_rangefinder_distance == round(self.rangefinder.distance, 1):
+        return
+    last_rangefinder_distance = round(self.rangefinder.distance, 1)
 
 video = cv2.VideoCapture(0)
 if (video.isOpened() == False):
@@ -45,42 +57,49 @@ if (video.isOpened() == False):
 video.set(3,1920)
 video.set(4,1080)
 
+while True:
+    time.sleep(1)
+    if global_location.alt > 10:
+        break
+
 start = time.time()
 count = 1
 telemetry_count = 1
-
 saved_coordinates = []
-run_once = 0
-while(True):
+run_once,run_once_tw = 0,0
+
+opened = 1813
+closed = 1109
+is_first_ball_gone = False
+while True:
     _, imageFrame = video.read()
-    end = time.time()
     hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
+    #red_lower = np.array([155,100,200])
+    #red_upper = np.array([180,255,255])
     red_lower,red_upper = np.array([136, 87, 111], np.uint8) , np.array([180, 255, 255], np.uint8)
     red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
     kernal = np.ones((5, 5), "uint8")
     red_mask = cv2.dilate(red_mask, kernal)
     res_red = cv2.bitwise_and(imageFrame, imageFrame, 
                               mask = red_mask)
-
     contours, hierarchy = cv2.findContours(red_mask,
                                            cv2.RETR_TREE,
                                            cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
     count+=1
-    if (end-start)>300:
-        break
+    pwm = closed
     length = len(saved_coordinates)
-    pwm = 2000
     for pic, contour in enumerate(contours[:1]):
         area = cv2.contourArea(contour)
-        if(area > 20000):
+        if area > 40000 and area<600000:
+            repeater += 1
             x, y, w, h = cv2.boundingRect(contour)
             cx = x + w/2
             cy = y + h/2
             radius = w/2
             coordinates = (int(x+w/2), int(y+h/2))
             center_point = (int(imageFrame.shape[1])//2,int(imageFrame.shape[0])//2)
-            xdist , ydist = coordinates[0] - center_point[0],coordinates[1] - center_point[1]
+            xdist , ydist = coordinates[0] - center_point[0],center_point[1]-coordinates[1]
             pixel_distance = math.sqrt(xdist**2 + ydist**2)
             xreal,yreal=(1.25*xdist/radius),(1.25*ydist/radius)
             real_distance = math.sqrt(xreal**2 + yreal**2)
@@ -89,8 +108,6 @@ while(True):
             dist_target = math.sqrt(east_d**2+north_d**2)
             red_carpet_loc = get_location_meters(global_location,north_d,east_d)
             saved_coordinates.append(red_carpet_loc)
-            pwm = 1000
-            print("Servo function triggered!")
             info = """
 x_d = {} y_d = {} p_d = {} \n
 x_r = {} y_r = {} r_d = {} \n
@@ -107,52 +124,40 @@ pixel_num = {}
             [global_location.lat,global_location.lon,global_location.alt],
             [red_carpet_loc.lat,red_carpet_loc.lon,red_carpet_loc.alt],
             area)
+            print("Red carpet seen")
             y0, dy = 7, 15
             for i, line in enumerate(info.split('\n')):
-                y = y0 + i*dy
-                cv2.putText(imageFrame, line, (0,y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
-            print("Red zone found! \n"+info + "\n -----------------------------------------------------")
-            cv2.circle(imageFrame,(x+w//2,y+h//2),int(radius),(0,255,255),3)
+                ky = y0 + i*dy
+                cv2.putText(imageFrame, line, (0,ky), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
+            cv2.circle(imageFrame,(x+w//2,y+h//2),int(radius),(255,0,255),3)
             cv2.putText(imageFrame,str(east_d)+" "+str(north_d)+" "+str(dist_target),((center_point[0]),(center_point[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
             cv2.line(imageFrame,((center_point[0]),(center_point[1])),coordinates,(0,255,0),2)
-    cv2.imwrite("/home/pi/Desktop/auto-mission-updater-opencv/frames_project/frame{}.jpg".format(count),imageFrame)
-    if pwm == 1000:
-        set_servo(iha,11,pwm)
-        run_once = 0
-    elif pwm ==2000 and run_once==0:
-        run_once = 1
-        set_servo(iha,11,pwm)
-        telemetry_sender(iha,telemetry_count)
-        telemetry_count+=1
+            pwm = opened
+        else:
+            pwm = closed
+            repeater = 0
+    cv2.imwrite("/home/pi/Desktop/auto-mission-updater-opencv/frames_fbwa/frame{}.jpg".format(count),imageFrame)
+    if is_first_ball_gone == False:
+        if pwm == opened:
+            set_servo(iha,11,pwm)
+            is_first_ball_gone = True
+            run_once = 0
+        elif pwm ==closed and run_once==0:
+            run_once = 1
+            set_servo(iha,11,pwm)
+            telemetry_count+=1
+    else:
+        if pwm == opened:
+            set_servo(iha,12,pwm)
+            is_first_ball_gone = True
+            run_once_tw = 0
+        elif pwm ==closed and run_once_tw==0:
+            run_once = 1
+            set_servo(iha,12,pwm)
+            telemetry_count+=1
         
         
-endlast = time.time()
-print("Video recording has been finished!")
-print("Flight notes: ")
-print("********************************************************")
-print("Flight time: %s" % (endlast-start))
-print("Total distance taken: %s" % get_distance_meters(iha.home_location, global_location))
-print("Home location: %s" % iha.home_location)
-if len(saved_coordinates)==0:
-    print("No red carpet found!")
-else:
-    print("Red carpet found {} times!".format(len(saved_coordinates)))
-    print("Coordinates: ")
-    for i in saved_coordinates:
-        print("lat: {}, lon: {}, alt: {}".format(i.lat,i.lon,i.alt))
-lats,lons,alts=[],[],[]
-for i in saved_coordinates:
-    lats.append(i.lat)
-    lons.append(i.lon)
-    alts.append(i.alt)
-act_lat = sum(lats)/len(lats)
-act_lon = sum(lons)/len(lons)
-act_alt = sum(alts)/len(alts)
-print("Actual location: {} {} {}".format(act_lat,act_lon,act_alt))
-print("********************************************************")
-sys.stdout = old_stdout
-log_file.close()
-  
+
         
    
     

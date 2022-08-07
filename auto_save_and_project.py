@@ -9,6 +9,7 @@ from plane_functions import *
 '''old_stdout = sys.stdout
 log_file = open("/home/pi/Desktop/auto-mission-updater-opencv/log.txt","w")
 sys.stdout = log_file'''
+
 connection_string="/dev/serial/by-id/usb-Hex_ProfiCNC_CubeOrange_3E0040001151303437363830-if00"
 
 print("Connecting to İHA...")
@@ -28,6 +29,12 @@ def attitude_listener(self, name, msg):
     if attitude.pitch == round(self.attitude.pitch,2) or attitude.roll == round(self.attitude.roll,2):
         return
     attitude = self.attitude
+
+next_waypoint = iha.commands.next
+@iha.on_message('MISSION_CURRENT')
+def mission_current_listener(self, name, msg):
+    global next_waypoint
+    next_waypoint = self.commands.next
 
 global_location = iha.location.global_relative_frame
 @iha.on_attribute('location.global_relative_frame')
@@ -51,28 +58,30 @@ def rangefinder_callback(self,attr_name):
         return
     last_rangefinder_distance = round(self.rangefinder.distance, 1)
 
-start_for_sleep = time.time()
-print("Sleeping started!")
-while True:
-    time.sleep(1)
-    location_holder = global_location
-    if time.time() - start_for_sleep > 40:
-        break
-    
 video = cv2.VideoCapture(0)
 if (video.isOpened() == False):
     print("Error reading video file")
 video.set(3,1920)
 video.set(4,1080)
 
+print("Sleeping started!")
+while True:
+    time.sleep(1)
+    if global_location.alt > 10.0 :
+        print("Altitude target reached, altitude is: %s" % global_location.alt)
+        break
+    
 start = time.time()
 count = 1
 run_once,repeater = 0,0
 saved_coordinates,frames_list = [],[]
+
 while(True):
     _, imageFrame = video.read()
     hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
-    red_lower,red_upper = np.array([136, 87, 111], np.uint8) , np.array([180, 255, 255], np.uint8)
+    red_lower = np.array([155,100,200])
+    red_upper = np.array([180,255,255])
+    #red_lower,red_upper = np.array([136, 87, 111], np.uint8) , np.array([180, 255, 255], np.uint8)
     red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
     kernal = np.ones((5, 5), "uint8")
     red_mask = cv2.dilate(red_mask, kernal)
@@ -86,7 +95,7 @@ while(True):
     length = len(saved_coordinates)
     for pic, contour in enumerate(contours[:1]):
         area = cv2.contourArea(contour)
-        if (area > 20000) and (area<600000):
+        if (area > 30000) and (area<500000):
             repeater += 1
             x, y, w, h = cv2.boundingRect(contour)
             cx = x + w/2
@@ -115,9 +124,10 @@ pixel_num = {}
             """.format(round(xdist,2),round(ydist,2),round(pixel_distance,2),
             round(xreal,2),round(yreal,2),round(real_distance,2),round(attitude.pitch,2),round(attitude.yaw,2),round(attitude.roll,2),
             round(east_d,2),round(north_d,2),round(dist_target,2),
-            [global_location.lat,global_location.lon,global_location.alt],
+            [global_location.lat,global_location.lon,last_rangefinder_distance],
             [red_carpet_loc.lat,red_carpet_loc.lon,red_carpet_loc.alt],
             area)
+            print("Red carpet seen")
             y0, dy = 7, 15
             for i, line in enumerate(info.split('\n')):
                 ky = y0 + i*dy
@@ -133,17 +143,22 @@ pixel_num = {}
     cv2.imwrite("/home/pi/Desktop/auto-mission-updater-opencv/frames_auto/frame{}.jpg".format(count),imageFrame)
             
     if repeater>=3:
-            print("Target has been found")
-            break
-print("Saved locations:")
-for i in range(len(saved_coordinates)):
-    print("Coordinate: {} {} {} (frame {})".format(saved_coordinates[i].lat,saved_coordinates[i].lon,saved_coordinates[i].alt,frames_list[i]))
-
-lat = sum([i.lat for i in saved_coordinates])/len(saved_coordinates)
-lon = sum([i.lon for i in saved_coordinates])/len(saved_coordinates)
-alt = sum([i.alt for i in saved_coordinates])/len(saved_coordinates)
-print("Actual location: {} {} {}".format(lat,lon,alt))
-red_zone_location = LocationGlobalRelative(lat,lon,alt)
+        print("Target has been found")
+        break
+    if next_waypoint==6:
+        print("Time is up, target not found")
+        break
+if len(saved_coordinates) == 0:
+    red_zone_location = LocationGlobalRelative(39.70245,32.75705,10)
+else:
+    print("Saved locations:")
+    for i in range(len(saved_coordinates)):
+        print("Coordinate: {} {} {} (frame {})".format(saved_coordinates[i].lat,saved_coordinates[i].lon,saved_coordinates[i].alt,frames_list[i]))
+    latr = sum([i.lat for i in saved_coordinates])/len(saved_coordinates)
+    lonr = sum([i.lon for i in saved_coordinates])/len(saved_coordinates)
+    altr = sum([i.alt for i in saved_coordinates])/len(saved_coordinates)
+    print("Actual location: {} {} {}".format(latr,lonr,10))
+    red_zone_location = LocationGlobalRelative(latr,lonr,10)
 
 mission_updater_new(iha,red_zone_location)
 
@@ -161,15 +176,18 @@ print("Mission started, please wait...")
 closed = 1813
 opened = 1109
 
+started_ball = time.time()
+
 while True:
-    time.sleep(0.2)
-    #nextwaypoint=iha.commands.next
+    time.sleep(0.1)
     vy = math.sqrt(velocity[1]*velocity[1]+velocity[0]*velocity[0])
-    fall_time = math.sqrt(2*np.abs(last_rangefinder_distance)/9.98)   
+    if global_location.alt <= 12:
+        fall_time = math.sqrt(2*np.abs(last_rangefinder_distance)/9.98)
+    else:
+        fall_time = math.sqrt(2*np.abs(global_location.alt)/9.98)  
     pwm = closed
-    #if nextwaypoint==4:
-    #print("Next waypoint is the fourth one!")
-    if get_distance_meters(global_location,red_zone_location)<=vy*fall_time+5:
+    if get_distance_meters(global_location,red_zone_location)<=vy*fall_time+3:
+        print("vy: {} fall_time: {} range_finder_height = {}".format(vy,fall_time,last_rangefinder_distance))
         print("Target has been reached!")
         print("There are {} meters to the target, plane is in {} {} and red zone is in {} {}".format(get_distance_meters(global_location,red_zone_location),
                                                                             global_location.lat,global_location.lon,
@@ -184,10 +202,12 @@ while True:
         run_once = 1
     if telemetry_count>=3:
         break
+    if time.time()-started_ball >= 30.0:
+        set_servo(iha,11,opened)
+        break
 
 start_to_second = time.time()
 while True:
-    time.sleep(1)
     holder_loc = global_location
     if time.time()-start_to_second>=10:
         break
@@ -198,15 +218,15 @@ run_once_2 = 0
 closed_t = 1109
 opened_t = 1813
 
+started_ball_two = time.time()
+
 while True:
-    time.sleep(0.2)
-    #nextwaypoint=iha.commands.next
+    time.sleep(0.1)
     vy = math.sqrt(velocity[1]*velocity[1]+velocity[0]*velocity[0])
     fall_time = math.sqrt(2*np.abs(last_rangefinder_distance)/9.98)   
     pwm = closed_t
-    #if nextwaypoint==4:
-    #print("Next waypoint is the fourth one!")
-    if get_distance_meters(global_location,red_zone_location)<=vy*fall_time+5:
+    if get_distance_meters(global_location,red_zone_location)<=vy*fall_time+3:
+        print("vy: {} fall_time: {} range_finder_height = {}".format(vy,fall_time,last_rangefinder_distance))
         print("Target has been reached!")
         print("There are {} meters to the target, plane is in {} {} and red zone is in {} {}".format(get_distance_meters(global_location,red_zone_location),
                                                               global_location.lat,global_location.lon,
@@ -220,6 +240,9 @@ while True:
         set_servo(iha,12,pwm)
         run_once_2 = 1
     if telemetry_count-telemetry_saved>=3:
+        break
+    if time.time()-started_ball_two >= 25.0:
+        set_servo(iha,12,opened_t)
         break
 '''sys.stdout = old_stdout
 log_file.close()'''

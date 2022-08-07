@@ -4,8 +4,6 @@ import cv2
 import sys
 cap = cv2.VideoCapture('output_video.avi')
 
-    
-
 # Check if camera opened successfully
 
 imageFrame = cv2.imread("frame355.jpg")
