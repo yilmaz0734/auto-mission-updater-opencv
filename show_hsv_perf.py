@@ -6,12 +6,13 @@ cap = cv2.VideoCapture('output_video.avi')
 
 # Check if camera opened successfully
 
-imageFrame = cv2.imread("frame355.jpg")
+imageFrame = cv2.imread("frame9.jpg")
 cv2.imwrite( "frame362.jpg",cv2.cvtColor(imageFrame,cv2.COLOR_RGB2BGR))
 print(imageFrame.shape)
 hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
-red_lower = np.array([30,150,50])
+red_lower = np.array([136,87,160])
 red_upper = np.array([255,255,180])
+
 red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
 kernal = np.ones((5, 5), "uint8")
 red_mask = cv2.dilate(red_mask, kernal)
