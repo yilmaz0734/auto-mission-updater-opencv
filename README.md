@@ -4,7 +4,7 @@
 
 This repository is created for Teknofest 2022 International UAV competition. The main purpose is to detect a red circular area with a radius of 1.25 meters from a minimum of 5 meters height. After identifying the coordinates of the target, a ball should be released at the correct time to hit the target. Since our purpose is to achieve this in AUTO mode, we need an automatic mission updating purpose in MissionPlanner, which was done with Python.
 
-![An image taken during the flight of the UAV](UAV%20Mission%20Updater%20ae7667eff0424c8a8f0dcd3e3539dadb/iha_flying.png)
+![An image taken during the flight of the UAV](./data/iha_flying.png)
 
 An image taken during the flight of the UAV
 
