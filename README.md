@@ -46,4 +46,6 @@ Coordinate calculations photo from Teknofest competition.
 
 In mission updating, MissionPlanner interface has been used. By dronekit mission download and upload functions, we can change the route of our plane with the new coordinates of the target calculated in the first lap in the competition
 
+<div align="center">
 ![Before mission update](./data/screen.png)
+</div>
