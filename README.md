@@ -30,7 +30,7 @@ An image taken during the flight of the UAV
 
 **HSV Filtering:** For color detection, HSV filtering applied. In the figure below, one can see how RGB to HSV conversion done. For tuning, many test flights have been done.
 
-![RGB to HSV conversion](UAV%20Mission%20Updater%20ae7667eff0424c8a8f0dcd3e3539dadb/Color-distribution-RGB-space-and-HSV-space-A-is-RGB-space-B-is-HSV-space.jpg)
+![RGB to HSV conversion](./data/Color-distribution-RGB-space-and-HSV-space-A-is-RGB-space-B-is-HSV-space.jpg)
 
 RGB to HSV conversion
 
@@ -38,7 +38,7 @@ RGB to HSV conversion
 
 For the determination of coordinates of the target, global relative frame has been used. The calculations can be observed in **<plane_functions.py>.** The mainly used module for this process is DroneKit-Python. By usage of this module, we calculated the distance between the coordinates of the UAV and the target detected with OpenCV module.
 
-![Coordinate calculations photo from Teknofest competition.](UAV%20Mission%20Updater%20ae7667eff0424c8a8f0dcd3e3539dadb/frame53.jpg)
+![Coordinate calculations photo from Teknofest competition.](./data/frame53.jpg)
 
 Coordinate calculations photo from Teknofest competition.
 
@@ -46,10 +46,4 @@ Coordinate calculations photo from Teknofest competition.
 
 In mission updating, MissionPlanner interface has been used. By dronekit mission download and upload functions, we can change the route of our plane with the new coordinates of the target calculated in the first lap in the competition
 
-![Before mission update](UAV%20Mission%20Updater%20ae7667eff0424c8a8f0dcd3e3539dadb/Untitled.png)
-
-Before mission update
-
-![After mission update](UAV%20Mission%20Updater%20ae7667eff0424c8a8f0dcd3e3539dadb/Untitled%201.png)
-
-After mission update
+![Before mission update](./data/screen.jpg)
